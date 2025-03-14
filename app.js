@@ -9,15 +9,12 @@ const { diag, DiagConsoleLogger, DiagLogLevel } = require('@opentelemetry/api');
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.VERBOSE);
 
 const jaegerExporter = new JaegerExporter({
-    // Point to OTel Collector instead of Jaeger directly
-    host: 'otel-collector.bankly.svc.cluster.local', // Cluster-internal hostname
-    port: 6831, // UDP port for Thrift Compact protocol
-    protocol: 'udp', // Explicitly set to UDP (Thrift Compact)
+    endpoint: 'http://jaeger-collector.bankly.svc.cluster.local:14268/api/traces', // Internal cluster endpoint
     onSuccess: (data) => {
-        console.log('✅ Traces sent to OpenTelemetry Collector successfully:', data);
+        console.log('✅ Traces sent to Jaeger successfully:', data);
     },
     onError: (error) => {
-        console.error('❌ Error sending traces to OpenTelemetry Collector:', error);
+        console.error('❌ Error sending traces to Jaeger:', error);
     }
 });
 

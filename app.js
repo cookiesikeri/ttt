@@ -10,6 +10,7 @@ diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.VERBOSE);
 
 const otlpExporter = new OTLPTraceExporter({
     url: 'grpc://otel-collector.bankly.svc.cluster.local:4317', // OTLP gRPC endpoint
+    insecure: true, // Explicitly disable TLS
     timeout: 5000, // Optional: timeout in milliseconds
 });
 

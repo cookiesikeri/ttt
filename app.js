@@ -1,6 +1,6 @@
 const { NodeSDK } = require('@opentelemetry/sdk-node');
 const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
-const { JaegerExporter } = require('@opentelemetry/exporter-jaeger');
+const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-grpc');
 const { Resource } = require('@opentelemetry/resources');
 const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventions');
 const { BatchSpanProcessor, AlwaysOnSampler } = require('@opentelemetry/sdk-trace-base');
@@ -8,27 +8,19 @@ const { diag, DiagConsoleLogger, DiagLogLevel } = require('@opentelemetry/api');
 
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.VERBOSE);
 
-const jaegerExporter = new JaegerExporter({
-    // Point to OTel Collector instead of Jaeger directly
-    host: 'otel-collector.bankly.svc.cluster.local', // Cluster-internal hostname
-    port: 6831, // UDP port for Thrift Compact protocol
-    protocol: 'udp', // Explicitly set to UDP (Thrift Compact)
-    onSuccess: (data) => {
-        console.log('✅ Traces sent to OpenTelemetry Collector successfully:', data);
-    },
-    onError: (error) => {
-        console.error('❌ Error sending traces to OpenTelemetry Collector:', error);
-    }
+const otlpExporter = new OTLPTraceExporter({
+    url: 'grpc://otel-collector.bankly.svc.cluster.local:4317', // OTLP gRPC endpoint
 });
 
 const sdk = new NodeSDK({
     resource: new Resource({
-        [SemanticResourceAttributes.SERVICE_NAME]: 'devtestv2', // Match your app name
+        [SemanticResourceAttributes.SERVICE_NAME]: 'devtestv2',
         [SemanticResourceAttributes.SERVICE_VERSION]: '1.0.0',
     }),
-    spanProcessors: [new BatchSpanProcessor(jaegerExporter)],
+    spanProcessors: [new BatchSpanProcessor(otlpExporter)],
     instrumentations: [getNodeAutoInstrumentations()],
     sampler: new AlwaysOnSampler(),
+    resourceDetectors: [],
 });
 
 console.log('Initializing OpenTelemetry SDK...');

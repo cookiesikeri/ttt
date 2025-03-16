@@ -1,6 +1,6 @@
 const { NodeSDK } = require('@opentelemetry/sdk-node');
 const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
-const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-grpc');
+const { JaegerExporter } = require('@opentelemetry/exporter-jaeger');
 const { Resource } = require('@opentelemetry/resources');
 const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventions');
 const { BatchSpanProcessor, AlwaysOnSampler } = require('@opentelemetry/sdk-trace-base');
@@ -8,21 +8,24 @@ const { diag, DiagConsoleLogger, DiagLogLevel } = require('@opentelemetry/api');
 
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.VERBOSE);
 
-const otlpExporter = new OTLPTraceExporter({
-    url: 'grpc://otel-collector.bankly.svc.cluster.local:4317', // OTLP gRPC endpoint
-    insecure: true, // Disable TLS
-    timeout: 5000, // Optional: timeout in milliseconds
+const jaegerExporter = new JaegerExporter({
+    endpoint: 'http://jaeger-collector.bankly.svc.cluster.local:14268/api/traces', // Internal cluster endpoint
+    onSuccess: (data) => {
+        console.log('✅ Traces sent to Jaeger successfully:', data);
+    },
+    onError: (error) => {
+        console.error('❌ Error sending traces to Jaeger:', error);
+    }
 });
 
 const sdk = new NodeSDK({
     resource: new Resource({
-        [SemanticResourceAttributes.SERVICE_NAME]: 'devtestv2',
+        [SemanticResourceAttributes.SERVICE_NAME]: 'devtestv2', // Match your app name
         [SemanticResourceAttributes.SERVICE_VERSION]: '1.0.0',
     }),
-    spanProcessors: [new BatchSpanProcessor(otlpExporter)],
+    spanProcessors: [new BatchSpanProcessor(jaegerExporter)],
     instrumentations: [getNodeAutoInstrumentations()],
     sampler: new AlwaysOnSampler(),
-    resourceDetectors: [],
 });
 
 console.log('Initializing OpenTelemetry SDK...');

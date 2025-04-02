@@ -5,11 +5,12 @@ const { Resource } = require('@opentelemetry/resources');
 const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventions');
 const { BatchSpanProcessor, AlwaysOnSampler } = require('@opentelemetry/sdk-trace-base');
 const { diag, DiagConsoleLogger, DiagLogLevel } = require('@opentelemetry/api');
+const axios = require('axios'); // Add axios for HTTP calls
 
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.VERBOSE);
 
 const jaegerExporter = new JaegerExporter({
-    endpoint: 'http://jaeger-collector.bankly.svc.cluster.local:14268/api/traces', // Internal cluster endpoint
+    endpoint: 'http://jaeger-collector.bankly.svc.cluster.local:14268/api/traces',
     onSuccess: (data) => {
         console.log('✅ Traces sent to Jaeger successfully:', data);
     },
@@ -20,7 +21,7 @@ const jaegerExporter = new JaegerExporter({
 
 const sdk = new NodeSDK({
     resource: new Resource({
-        [SemanticResourceAttributes.SERVICE_NAME]: 'devtestv2', // Match your app name
+        [SemanticResourceAttributes.SERVICE_NAME]: 'devtestv2',
         [SemanticResourceAttributes.SERVICE_VERSION]: '1.0.0',
     }),
     spanProcessors: [new BatchSpanProcessor(jaegerExporter)],
@@ -67,6 +68,29 @@ app.get('/api/transactions', async(req, res) => {
 });
 
 const { trace } = require('@opentelemetry/api');
+
+// New endpoint to call another service
+app.get('/api/call-identity', async(req, res) => {
+    const tracer = trace.getTracer('devtestv2-tracer');
+    const span = tracer.startSpan('call-identity-span');
+    span.setAttribute('http.method', 'GET');
+    try {
+        console.log('Calling Bankly-Identity-MS...');
+        const response = await axios.get('http://bankly-identity-ms.bankly.svc.cluster.local:80/', {
+            headers: {
+                'X-Custom-Header': 'devtestv2' // Optional: for debugging
+            }
+        });
+        span.setAttribute('http.status_code', response.status);
+        res.json({ message: 'Called Bankly-Identity-MS', data: response.data });
+    } catch (error) {
+        span.setAttribute('error', true);
+        span.setAttribute('error.message', error.message);
+        res.status(500).json({ error: 'Failed to call Bankly-Identity-MS' });
+    } finally {
+        span.end();
+    }
+});
 
 app.get('/api/manual-trace', async(req, res) => {
     console.log('Creating a manual trace...');
